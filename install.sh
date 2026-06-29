@@ -120,8 +120,9 @@ fi
 "$CLI" -p agentrouter config set model.default "$MODEL"
 "$CLI" -p agentrouter config set model.provider copilot-acp
 "$CLI" -p agentrouter config set model.base_url acp://copilot
-"$CLI" -p agentrouter config set agent.reasoning_effort medium
+"$CLI" -p agentrouter config set agent.reasoning_effort high
 "$CLI" -p agentrouter config set agent.max_turns 20
+"$CLI" -p agentrouter config set agent.api_max_retries 1
 "$CLI" -p agentrouter config set display.show_reasoning true
 
 "$HERMES_PYTHON" "$SCRIPT_DIR/scripts/patch-hermes.py" --hermes-root "$HERMES_ROOT"

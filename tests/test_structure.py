@@ -16,7 +16,7 @@ assert not missing, f'Missing files: {missing}'
 
 manifest = json.loads((ROOT / '.codex-plugin/plugin.json').read_text(encoding='utf-8'))
 assert manifest['name'] == 'hermes-agentrouter'
-assert manifest['version'] == '1.1.0'
+assert manifest['version'] == '1.1.1'
 
 for path in required:
     if path.is_file():
@@ -38,6 +38,9 @@ assert "HERMES_AGENTROUTER_TOKEN_EFFICIENT='1'" in windows_runtime
 assert "--model 'glm-5.2'" in windows_runtime
 assert 'HERMES_DESKTOP_USER_DATA_DIR' in windows_runtime
 assert "@{profile='agentrouter'}" in windows_runtime and 'UTF8Encoding' in windows_runtime
+assert "Arguments[0] -eq 'key'" in windows_runtime
+assert "gatewayArgs[0] -eq 'supervise'" in windows_runtime
+assert 'install-service' in windows_runtime
 
 posix_installer = (ROOT / 'install.sh').read_text(encoding='utf-8')
 posix_runtime = (ROOT / 'scripts/runtime-posix.sh').read_text(encoding='utf-8')
@@ -46,6 +49,7 @@ assert '@qwen-code/qwen-code@$QWEN_VERSION' in posix_installer
 assert 'config.before-agentrouter' not in posix_installer
 for setting in ('HERMES_AGENTROUTER_RAW_BRIDGE', 'QWEN_CODE_ROOT', 'QWEN_CODE_VERSION'):
     assert setting in posix_runtime
+assert 'NEW_TOKEN' in posix_runtime and '"${1:-}" == supervise' in posix_runtime
 
 node_bridge = (ROOT / 'scripts/qwen-provider-bridge.mjs').read_text(encoding='utf-8')
 assert 'stream_options: { include_usage: true }' in node_bridge

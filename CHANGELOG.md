@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.1 - 2026-06-29
+
+- Added supervised gateway execution with automatic restart after unexpected exits.
+- Added atomic, validated AgentRouter key rotation on Windows, macOS, and Linux.
+- Added a Windows scheduled-task installer for always-on messaging gateways.
+- Set GLM-5.2 high reasoning and a single provider attempt by default to reduce latency and wasted quota.
+- Documented Telegram's single-poller requirement and duplicate-gateway diagnosis.
+
 ## 1.1.0 - 2026-06-29
 
 - Added an isolated `agentrouter` profile on Windows, macOS, and Linux.

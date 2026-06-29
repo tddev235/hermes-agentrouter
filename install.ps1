@@ -122,8 +122,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Could not set the Hermes provider.' }
     & $ConfigCli -p agentrouter config set model.base_url 'acp://copilot'
     if ($LASTEXITCODE -ne 0) { throw 'Could not set the Hermes ACP endpoint.' }
-    & $ConfigCli -p agentrouter config set agent.reasoning_effort medium
+    & $ConfigCli -p agentrouter config set agent.reasoning_effort high
     & $ConfigCli -p agentrouter config set agent.max_turns 20
+    & $ConfigCli -p agentrouter config set agent.api_max_retries 1
     & $ConfigCli -p agentrouter config set display.show_reasoning true
 
     $settings = @{ target=$Target; desktopExe=$DesktopExe; hermesCli=$CliPath; qwenCommand=$Qwen; nodeCommand=$Node; qwenRoot=$QwenRoot; qwenVersion=$QwenVersion; hermesRoot=$HermesRoot; profileHome=$ProfileHome; model=$Model; baseUrl=$BaseUrl }
