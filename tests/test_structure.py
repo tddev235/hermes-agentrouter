@@ -35,6 +35,8 @@ assert 'qwen-provider-bridge.mjs' in windows_installer
 runtime = (ROOT / 'scripts/runtime-windows.ps1').read_text(encoding='utf-8')
 assert "HERMES_AGENTROUTER_TOKEN_EFFICIENT='1'" in runtime
 assert "--model 'glm-5.2'" in runtime
+assert 'HERMES_DESKTOP_USER_DATA_DIR' in runtime
+assert "@{profile='agentrouter'}" in runtime and 'UTF8Encoding' in runtime
 
 node_bridge = (ROOT / 'scripts/qwen-provider-bridge.mjs').read_text(encoding='utf-8')
 assert 'stream_options: { include_usage: true }' in node_bridge

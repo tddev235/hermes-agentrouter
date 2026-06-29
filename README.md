@@ -15,6 +15,7 @@ Keywords: Hermes Agent API, AgentRouter Hermes plugin, Qwen Code ACP, GLM 5.2, G
 - Passes the selected Hermes model to Qwen dynamically.
 - Supports reasoning levels: off, low, medium, high, and max.
 - Creates an isolated `agentrouter` profile; normal Hermes/ChatGPT settings remain untouched.
+- Uses a separate Electron data directory for the AgentRouter shortcut, preventing its model selection from leaking into normal Hermes Desktop.
 - Avoids the extra model call normally used only to auto-name a new session.
 - Streams provider usage data and caps the native Hermes loop at 20 turns by default.
 - Validates the token with `glm-5.2` before changing Hermes.

@@ -114,7 +114,7 @@ try {
     $Node = Resolve-Executable @((Join-Path $BundledNode 'node.exe'),'node')
     $QwenRoot = Join-Path (Split-Path $Qwen) 'node_modules\@qwen-code\qwen-code'
     if (-not (Test-Path -LiteralPath $QwenRoot)) { throw 'The Qwen Code provider runtime could not be located.' }
-    $settings = @{ target=$Target; desktopExe=$DesktopExe; hermesCli=$CliPath; qwenCommand=$Qwen; nodeCommand=$Node; qwenRoot=$QwenRoot; qwenVersion=$QwenVersion; profileHome=$ProfileHome; model=$Model; baseUrl=$BaseUrl }
+    $settings = @{ target=$Target; desktopExe=$DesktopExe; hermesCli=$CliPath; qwenCommand=$Qwen; nodeCommand=$Node; qwenRoot=$QwenRoot; qwenVersion=$QwenVersion; hermesRoot=$HermesRoot; profileHome=$ProfileHome; model=$Model; baseUrl=$BaseUrl }
     $settings | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $InstallRoot 'settings.json') -Encoding UTF8
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'scripts\runtime-windows.ps1') -Destination (Join-Path $InstallRoot 'runtime.ps1') -Force
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'scripts\qwen-provider-bridge.mjs') -Destination (Join-Path $InstallRoot 'qwen-provider-bridge.mjs') -Force

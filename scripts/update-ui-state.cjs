@@ -2,11 +2,13 @@ const { ClassicLevel } = require('classic-level');
 
 const dbPath = process.argv[2];
 if (!dbPath) throw new Error('LevelDB path is required');
+const selectedModel = process.argv[3] || 'glm-5.2';
+const selectedProvider = process.argv[4] || 'copilot-acp';
 
 const db = new ClassicLevel(dbPath, { keyEncoding: 'buffer', valueEncoding: 'buffer' });
 const wanted = new Map([
-  ['hermes.desktop.composer.model', 'glm-5.2'],
-  ['hermes.desktop.composer.provider', 'copilot-acp'],
+  ['hermes.desktop.composer.model', selectedModel],
+  ['hermes.desktop.composer.provider', selectedProvider],
 ]);
 const defaultKey = name => Buffer.from(`_file://\x00\x01${name}`, 'utf8');
 
