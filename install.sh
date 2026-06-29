@@ -93,9 +93,8 @@ fi
 
 if (( ! SKIP_TEST )); then
   OPENAI_API_KEY="$TOKEN" OPENAI_BASE_URL="$BASE_URL" OPENAI_MODEL="$MODEL" \
-    "$QWEN" --bare --auth-type openai --model "$MODEL" --approval-mode plan \
-    --output-format json --max-session-turns 1 --max-tool-calls 0 \
-    'Reply exactly AGENTROUTER_GLM52_OK' | grep -q AGENTROUTER_GLM52_OK || {
+    QWEN_CODE_ROOT="$QWEN_ROOT" QWEN_CODE_VERSION="$QWEN_VERSION" \
+    node "$SCRIPT_DIR/scripts/qwen-provider-bridge.mjs" --check | grep -q AGENTROUTER_GLM52_OK || {
       echo "AgentRouter validation failed." >&2; exit 1;
     }
 fi

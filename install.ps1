@@ -91,14 +91,16 @@ try {
 
     if (-not $SkipTest) {
         Write-Host "Testing AgentRouter with $Model..."
-        $old = @($env:OPENAI_API_KEY,$env:OPENAI_BASE_URL,$env:OPENAI_MODEL,$env:PATH)
+        $old = @($env:OPENAI_API_KEY,$env:OPENAI_BASE_URL,$env:OPENAI_MODEL,$env:PATH,$env:QWEN_CODE_ROOT,$env:QWEN_CODE_VERSION)
         $env:OPENAI_API_KEY = $Token; $env:OPENAI_BASE_URL = $BaseUrl; $env:OPENAI_MODEL = $Model
         $env:PATH = "$(Split-Path $Qwen);$env:PATH"
         try {
-            $result = & $Qwen --bare --auth-type openai --model $Model --approval-mode plan --output-format json --max-session-turns 1 --max-tool-calls 0 'Reply exactly AGENTROUTER_GLM52_OK' 2>&1 | Out-String
+            $env:QWEN_CODE_ROOT=$QwenRoot; $env:QWEN_CODE_VERSION=$QwenVersion
+            $result = & $Node (Join-Path $PSScriptRoot 'scripts\qwen-provider-bridge.mjs') --check 2>&1 | Out-String
             if ($LASTEXITCODE -ne 0 -or $result -notmatch 'AGENTROUTER_GLM52_OK') { throw 'AgentRouter validation failed. Verify the token and try again.' }
         } finally {
             $env:OPENAI_API_KEY=$old[0]; $env:OPENAI_BASE_URL=$old[1]; $env:OPENAI_MODEL=$old[2]; $env:PATH=$old[3]
+            $env:QWEN_CODE_ROOT=$old[4]; $env:QWEN_CODE_VERSION=$old[5]
         }
     }
 

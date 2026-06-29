@@ -24,9 +24,7 @@ export HERMES_COPILOT_ACP_ARGS='--acp --bare --auth-type openai --model {model}'
 export PYTHONUTF8=1
 
 if [[ "${1:-}" == --check ]]; then
-  exec "$QWEN" --bare --auth-type openai --model "$MODEL" --approval-mode plan \
-    --output-format json --max-session-turns 1 --max-tool-calls 0 \
-    'Reply exactly AGENTROUTER_GLM52_OK'
+  exec "$HERMES_AGENTROUTER_NODE" "$HERMES_AGENTROUTER_RAW_BRIDGE" --check
 fi
 
 if [[ "${1:-}" == --desktop ]]; then
@@ -42,4 +40,9 @@ fi
 
 export HERMES_HOME="$PROFILE_HOME"
 export HERMES_PROFILE=agentrouter
+if [[ "${1:-}" == gateway ]]; then
+  shift
+  export HERMES_HOME="$HERMES_DATA_ROOT"
+  exec "$CLI" --profile agentrouter gateway "$@"
+fi
 exec "$CLI" chat --provider copilot-acp --model "$MODEL" "$@"

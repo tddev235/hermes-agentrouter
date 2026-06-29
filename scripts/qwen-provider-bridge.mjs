@@ -42,6 +42,45 @@ function emit(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
 }
 
+async function streamRequest(request, onChunk) {
+  const body = {
+    model: request.model || 'glm-5.2',
+    messages: request.messages || [],
+    stream: true,
+    stream_options: { include_usage: true },
+  };
+  if (Array.isArray(request.tools) && request.tools.length) body.tools = request.tools;
+  if (request.tool_choice !== undefined && request.tool_choice !== null) body.tool_choice = request.tool_choice;
+  if (request.reasoning_effort === 'none') {
+    body.reasoning = false;
+  } else if (request.reasoning_effort) {
+    body.reasoning = { effort: request.reasoning_effort === 'xhigh' ? 'max' : request.reasoning_effort };
+  }
+  for (const key of ['temperature', 'max_tokens', 'max_completion_tokens', 'top_p', 'stop']) {
+    if (request[key] !== undefined && request[key] !== null) body[key] = request[key];
+  }
+  const stream = await client.chat.completions.create(body);
+  for await (const chunk of stream) await onChunk(chunk);
+}
+
+if (process.argv.includes('--check')) {
+  let content = '';
+  try {
+    await streamRequest({
+      model: process.env.OPENAI_MODEL || 'glm-5.2',
+      messages: [{ role: 'user', content: 'Reply exactly AGENTROUTER_GLM52_OK' }],
+      reasoning_effort: 'none',
+      max_completion_tokens: 32,
+    }, (chunk) => {
+      content += chunk?.choices?.[0]?.delta?.content || '';
+    });
+    if (content.trim() !== 'AGENTROUTER_GLM52_OK') throw new Error(`Unexpected check response: ${content.trim()}`);
+    process.stdout.write('AGENTROUTER_GLM52_OK\n');
+  } catch (error) {
+    process.stderr.write(`${String(error?.message || error)}\n`);
+    process.exitCode = 1;
+  }
+} else {
 const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
 for await (const line of input) {
   const cleanLine = line.replace(/^\uFEFF/, '');
@@ -49,26 +88,10 @@ for await (const line of input) {
   let request;
   try {
     request = JSON.parse(cleanLine);
-    const body = {
-      model: request.model || 'glm-5.2',
-      messages: request.messages || [],
-      stream: true,
-      stream_options: { include_usage: true },
-    };
-    if (Array.isArray(request.tools) && request.tools.length) body.tools = request.tools;
-    if (request.tool_choice !== undefined && request.tool_choice !== null) body.tool_choice = request.tool_choice;
-    if (request.reasoning_effort === 'none') {
-      body.reasoning = false;
-    } else if (request.reasoning_effort) {
-      body.reasoning = { effort: request.reasoning_effort === 'xhigh' ? 'max' : request.reasoning_effort };
-    }
-    for (const key of ['temperature', 'max_tokens', 'max_completion_tokens', 'top_p', 'stop']) {
-      if (request[key] !== undefined && request[key] !== null) body[key] = request[key];
-    }
-    const stream = await client.chat.completions.create(body);
-    for await (const chunk of stream) emit({ id: request.id, type: 'chunk', chunk });
+    await streamRequest(request, (chunk) => emit({ id: request.id, type: 'chunk', chunk }));
     emit({ id: request.id, type: 'done' });
   } catch (error) {
     emit({ id: request?.id, type: 'error', error: String(error?.message || error) });
   }
+}
 }

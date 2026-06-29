@@ -18,7 +18,7 @@ try {
   $env:QWEN_CODE_VERSION=$s.qwenVersion
   $env:PYTHONUTF8='1'; $env:PATH="$(Split-Path $s.qwenCommand);$env:PATH"
   if ($Arguments -contains '--check') {
-    & $s.qwenCommand --bare --auth-type openai --model $s.model --approval-mode plan --output-format json --max-session-turns 1 --max-tool-calls 0 'Reply exactly AGENTROUTER_GLM52_OK'
+    & $s.nodeCommand (Join-Path $root 'qwen-provider-bridge.mjs') --check
   } elseif ($Arguments -contains '--desktop') {
     if (Get-Process -Name Hermes -ErrorAction SilentlyContinue) { throw 'Close Hermes completely before using the AgentRouter shortcut.' }
     $env:HERMES_HOME=$s.hermesRoot
@@ -28,8 +28,14 @@ try {
     [IO.File]::WriteAllText((Join-Path $env:HERMES_DESKTOP_USER_DATA_DIR 'active-profile.json'),$profileJson,[Text.UTF8Encoding]::new($false))
     Start-Process -FilePath $s.desktopExe -WorkingDirectory (Split-Path $s.desktopExe)
   } else {
-    $env:HERMES_HOME=$s.profileHome
-    & $s.hermesCli chat --provider copilot-acp --model 'glm-5.2' @Arguments
+    if ($Arguments.Count -gt 0 -and $Arguments[0] -eq 'gateway') {
+      $env:HERMES_HOME=$s.hermesRoot
+      $gatewayArgs = if ($Arguments.Count -gt 1) { $Arguments[1..($Arguments.Count-1)] } else { @() }
+      & $s.hermesCli -p agentrouter gateway @gatewayArgs
+    } else {
+      $env:HERMES_HOME=$s.profileHome
+      & $s.hermesCli chat --provider copilot-acp --model 'glm-5.2' @Arguments
+    }
   }
 } finally {
   if($ptr -ne [IntPtr]::Zero){[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)}
