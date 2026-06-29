@@ -1,3 +1,8 @@
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+    'PSAvoidUsingConvertToSecureStringWithPlainText',
+    '',
+    Justification='-TokenFile is an explicitly selected local plaintext input; it is immediately protected with user-scoped DPAPI.'
+)]
 [CmdletBinding()]
 param(
     [ValidateSet('Auto','Desktop','CLI','Both')][string]$Target = 'Auto',
@@ -97,7 +102,7 @@ try {
         }
     }
 
-    $EncryptedToken = $Token | ConvertTo-SecureString -AsPlainText -Force | ConvertFrom-SecureString
+    $EncryptedToken = ConvertFrom-SecureString $SecureToken
     [IO.File]::WriteAllText((Join-Path $InstallRoot 'token.dpapi'), $EncryptedToken, [Text.UTF8Encoding]::new($false))
     $EncryptedToken = $null
 
