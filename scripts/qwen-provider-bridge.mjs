@@ -52,8 +52,10 @@ async function streamRequest(request, onChunk) {
   if (Array.isArray(request.tools) && request.tools.length) body.tools = request.tools;
   if (request.tool_choice !== undefined && request.tool_choice !== null) body.tool_choice = request.tool_choice;
   if (request.reasoning_effort === 'none') {
+    body.thinking = { type: 'disabled' };
     body.reasoning = false;
   } else if (request.reasoning_effort) {
+    body.thinking = { type: 'enabled' };
     body.reasoning = { effort: request.reasoning_effort === 'xhigh' ? 'max' : request.reasoning_effort };
   }
   for (const key of ['temperature', 'max_tokens', 'max_completion_tokens', 'top_p', 'stop']) {
@@ -70,7 +72,7 @@ if (process.argv.includes('--check')) {
       model: process.env.OPENAI_MODEL || 'glm-5.2',
       messages: [{ role: 'user', content: 'Reply exactly AGENTROUTER_GLM52_OK' }],
       reasoning_effort: 'none',
-      max_completion_tokens: 32,
+      max_completion_tokens: 128,
     }, (chunk) => {
       content += chunk?.choices?.[0]?.delta?.content || '';
     });
