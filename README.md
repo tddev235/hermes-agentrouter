@@ -1,6 +1,6 @@
 # Hermes AgentRouter Integration
 
-[![CI](https://github.com/mardovip66/hermes-agentrouter/actions/workflows/ci.yml/badge.svg)](https://github.com/mardovip66/hermes-agentrouter/actions/workflows/ci.yml)
+[![CI](https://github.com/tddev235/hermes-agentrouter/actions/workflows/ci.yml/badge.svg)](https://github.com/tddev235/hermes-agentrouter/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Connect **Hermes Agent Desktop and CLI** to [AgentRouter](https://agentrouter.org) through Qwen Code's official OpenAI-compatible provider layer. Hermes—not a nested Qwen agent—keeps control of its native tools, skills, memory, sessions, and reasoning display. `glm-5.2` is pinned as the default and runtime model.
@@ -34,7 +34,7 @@ Keywords: Hermes Agent API, AgentRouter Hermes plugin, Qwen Code ACP, GLM 5.2, G
 ### Windows
 
 ```powershell
-git clone https://github.com/mardovip66/hermes-agentrouter.git
+git clone https://github.com/tddev235/hermes-agentrouter.git
 cd hermes-agentrouter
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
@@ -48,7 +48,7 @@ Optional unattended target selection:
 ### macOS / Linux / WSL
 
 ```bash
-git clone https://github.com/mardovip66/hermes-agentrouter.git
+git clone https://github.com/tddev235/hermes-agentrouter.git
 cd hermes-agentrouter
 ./install.sh
 ```
