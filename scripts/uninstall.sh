@@ -9,7 +9,7 @@ if [[ "$(uname -s)" == Darwin ]]; then security delete-generic-password -a "$USE
 elif command -v secret-tool >/dev/null; then secret-tool clear service hermes-agentrouter account "$USER" || true
 else rm -f "$root/token"; fi
 if [[ -n "$hermes_root" ]]; then
-  for relative in agent/copilot_acp_client.py hermes_cli/models.py hermes_cli/model_switch.py hermes_cli/auth.py hermes_cli/providers.py; do
+  for relative in agent/copilot_acp_client.py agent/chat_completion_helpers.py hermes_cli/models.py hermes_cli/model_switch.py hermes_cli/auth.py hermes_cli/providers.py; do
     [[ -f "$hermes_root/$relative.before-agentrouter-plugin" ]] && mv "$hermes_root/$relative.before-agentrouter-plugin" "$hermes_root/$relative"
   done
 fi

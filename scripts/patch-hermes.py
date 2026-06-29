@@ -258,6 +258,21 @@ def patch_labels(root: Path) -> None:
         path.write_text(text.replace(old, new, 1), encoding="utf-8")
 
 
+def patch_nonstream_reasoning(root: Path) -> None:
+    path = root / "agent" / "chat_completion_helpers.py"
+    old = '''        if not agent.stream_delta_callback and not agent._stream_callback:
+            try:
+                agent.reasoning_callback(reasoning_text)'''
+    new = '''        _is_nonstreaming_acp = (
+            str(getattr(agent, "provider", "") or "").lower() == "copilot-acp"
+            or str(getattr(agent, "base_url", "") or "").lower().startswith("acp://")
+        )
+        if _is_nonstreaming_acp or (not agent.stream_delta_callback and not agent._stream_callback):
+            try:
+                agent.reasoning_callback(reasoning_text)'''
+    replace_required(path, old, new, "_is_nonstreaming_acp = (")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--hermes-root", required=True, type=Path)
@@ -265,6 +280,7 @@ def main() -> None:
     root = args.hermes_root.resolve()
     required = [
         root / "agent" / "copilot_acp_client.py",
+        root / "agent" / "chat_completion_helpers.py",
         root / "hermes_cli" / "models.py",
         root / "hermes_cli" / "model_switch.py",
         root / "hermes_cli" / "auth.py",
@@ -277,6 +293,7 @@ def main() -> None:
         patch_models(root)
         patch_picker(root)
         patch_client(root)
+        patch_nonstream_reasoning(root)
         patch_labels(root)
     except Exception:
         for path, content in originals.items():
