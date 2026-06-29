@@ -13,6 +13,8 @@ $HermesRoot = Join-Path $env:LOCALAPPDATA 'hermes'
 $DesktopExe = Join-Path $HermesRoot 'hermes-agent\apps\desktop\release\win-unpacked\Hermes.exe'
 $BundledCli = Join-Path $HermesRoot 'hermes-agent\venv\Scripts\hermes.exe'
 $BundledNode = Join-Path $HermesRoot 'node'
+$ProfileHome = Join-Path $HermesRoot 'profiles\agentrouter'
+$QwenVersion = '0.19.3'
 
 function Resolve-Executable([string[]]$Names) {
     foreach ($name in $Names) {
@@ -55,7 +57,7 @@ if (-not $Qwen) {
     if (-not $Npm) { throw 'Node.js/npm is required to install Qwen Code.' }
     if ($Node) { $env:PATH = "$(Split-Path $Node);$env:PATH" }
     Write-Host 'Installing Qwen Code...'
-    & $Npm install -g '@qwen-code/qwen-code@0.19.3'
+    & $Npm install -g "@qwen-code/qwen-code@$QwenVersion"
     if ($LASTEXITCODE -ne 0) { throw 'Qwen Code installation failed.' }
     $Qwen = Resolve-Executable @((Join-Path $BundledNode 'qwen.cmd'),'qwen')
 }
@@ -90,27 +92,32 @@ try {
     [IO.File]::WriteAllText((Join-Path $InstallRoot 'token.dpapi'), $EncryptedToken, [Text.UTF8Encoding]::new($false))
     $EncryptedToken = $null
 
-    $ConfigPath = Join-Path $HermesRoot 'config.yaml'
-    if (Test-Path -LiteralPath $ConfigPath) {
-        $Backup = Join-Path $InstallRoot 'config.before-agentrouter.yaml'
-        if (-not (Test-Path -LiteralPath $Backup)) { Copy-Item -LiteralPath $ConfigPath -Destination $Backup }
-    }
-
     $ConfigCli = if ($CliPath) { $CliPath } else { $BundledCli }
+    if (-not (Test-Path -LiteralPath $ProfileHome)) {
+        & $ConfigCli profile create agentrouter --clone --no-alias --description 'Hermes with AgentRouter, pinned to GLM-5.2.'
+        if ($LASTEXITCODE -ne 0) { throw 'Could not create the isolated AgentRouter profile.' }
+    }
     $PatchPython = Resolve-Executable @((Join-Path $HermesRoot 'hermes-agent\venv\Scripts\python.exe'),'python')
     if (-not $PatchPython) { throw 'Python is required to install the Hermes compatibility patch.' }
     & $PatchPython (Join-Path $PSScriptRoot 'scripts\patch-hermes.py') --hermes-root (Join-Path $HermesRoot 'hermes-agent')
     if ($LASTEXITCODE -ne 0) { throw 'Hermes compatibility patch failed; all source changes were rolled back.' }
-    & $ConfigCli config set model.default $Model
+    & $ConfigCli -p agentrouter config set model.default $Model
     if ($LASTEXITCODE -ne 0) { throw 'Could not set the Hermes default model.' }
-    & $ConfigCli config set model.provider copilot-acp
+    & $ConfigCli -p agentrouter config set model.provider copilot-acp
     if ($LASTEXITCODE -ne 0) { throw 'Could not set the Hermes provider.' }
-    & $ConfigCli config set model.base_url 'acp://copilot'
+    & $ConfigCli -p agentrouter config set model.base_url 'acp://copilot'
     if ($LASTEXITCODE -ne 0) { throw 'Could not set the Hermes ACP endpoint.' }
+    & $ConfigCli -p agentrouter config set agent.reasoning_effort medium
+    & $ConfigCli -p agentrouter config set agent.max_turns 20
+    & $ConfigCli -p agentrouter config set display.show_reasoning true
 
-    $settings = @{ target=$Target; desktopExe=$DesktopExe; hermesCli=$CliPath; qwenCommand=$Qwen; model=$Model; baseUrl=$BaseUrl }
+    $Node = Resolve-Executable @((Join-Path $BundledNode 'node.exe'),'node')
+    $QwenRoot = Join-Path (Split-Path $Qwen) 'node_modules\@qwen-code\qwen-code'
+    if (-not (Test-Path -LiteralPath $QwenRoot)) { throw 'The Qwen Code provider runtime could not be located.' }
+    $settings = @{ target=$Target; desktopExe=$DesktopExe; hermesCli=$CliPath; qwenCommand=$Qwen; nodeCommand=$Node; qwenRoot=$QwenRoot; qwenVersion=$QwenVersion; profileHome=$ProfileHome; model=$Model; baseUrl=$BaseUrl }
     $settings | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $InstallRoot 'settings.json') -Encoding UTF8
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'scripts\runtime-windows.ps1') -Destination (Join-Path $InstallRoot 'runtime.ps1') -Force
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'scripts\qwen-provider-bridge.mjs') -Destination (Join-Path $InstallRoot 'qwen-provider-bridge.mjs') -Force
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'scripts\uninstall.ps1') -Destination (Join-Path $InstallRoot 'uninstall.ps1') -Force
 
     if ($Target -in @('Desktop','Both')) {
@@ -120,17 +127,8 @@ try {
             Read-Host 'Close Hermes completely, then press Enter'
             if (Get-Process -Name Hermes -ErrorAction SilentlyContinue) { throw 'Hermes is still running.' }
         }
-        $LevelDb = Join-Path $env:APPDATA 'Hermes\Local Storage\leveldb'
-        if (Test-Path -LiteralPath $LevelDb) {
-            if (-not $Npm -or -not $Node) { throw 'Node.js/npm is required to update Hermes Desktop model state.' }
-            $UiTools = Join-Path $InstallRoot 'ui-tools'
-            New-Item -ItemType Directory -Path $UiTools -Force | Out-Null
-            Copy-Item (Join-Path $PSScriptRoot 'scripts\update-ui-state.cjs') (Join-Path $UiTools 'update-ui-state.cjs') -Force
-            $env:PATH = "$(Split-Path $Node);$env:PATH"
-            & $Npm install --prefix $UiTools classic-level@3.0.0 --no-audit --no-fund | Out-Null
-            & $Node (Join-Path $UiTools 'update-ui-state.cjs') $LevelDb
-            if ($LASTEXITCODE -ne 0) { throw 'Hermes Desktop model-state update failed.' }
-        }
+        # The dedicated HERMES_HOME profile keeps Desktop state isolated; the
+        # normal Hermes application and its ChatGPT provider remain untouched.
     }
 
     $cmd='@echo off' + "`r`n" + 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\hermes-agentrouter\runtime.ps1" %*'

@@ -273,6 +273,79 @@ def patch_nonstream_reasoning(root: Path) -> None:
     replace_required(path, old, new, "_is_nonstreaming_acp = (")
 
 
+def patch_raw_provider(root: Path) -> None:
+    """Route native Hermes messages/tools through Qwen's provider client."""
+    source = Path(__file__).with_name("hermes_agentrouter_bridge.py")
+    target = root / "agent" / "hermes_agentrouter_bridge.py"
+    if not target.exists():
+        shutil.copy2(source, target)
+
+    client = root / "agent" / "copilot_acp_client.py"
+    replace_required(
+        client,
+        "from agent.file_safety import get_read_block_error, is_write_denied\n",
+        "from agent.file_safety import get_read_block_error, is_write_denied\n"
+        "from agent.hermes_agentrouter_bridge import RawQwenTransport, enabled as raw_bridge_enabled\n",
+        "from agent.hermes_agentrouter_bridge import RawQwenTransport",
+    )
+    replace_required(
+        client,
+        "        self._active_process_lock = threading.Lock()\n",
+        "        self._active_process_lock = threading.Lock()\n"
+        "        self._agentrouter_transport: RawQwenTransport | None = None\n",
+        "self._agentrouter_transport: RawQwenTransport",
+    )
+    replace_required(
+        client,
+        "    def close(self) -> None:\n        proc: subprocess.Popen[str] | None\n",
+        "    def close(self) -> None:\n"
+        "        # Keep the shared transport alive for auxiliary tasks in this process.\n"
+        "        if raw_bridge_enabled():\n"
+        "            self.is_closed = False\n"
+        "            return\n"
+        "        proc: subprocess.Popen[str] | None\n",
+        "Keep the shared transport alive for auxiliary tasks",
+    )
+    replace_required(
+        client,
+        "    ) -> Any:\n        prompt_text = _format_messages_as_prompt(\n",
+        "    ) -> Any:\n"
+        "        if raw_bridge_enabled():\n"
+        "            if self._agentrouter_transport is None:\n"
+        "                self._agentrouter_transport = RawQwenTransport(\n"
+        "                    cwd=self._acp_cwd, child_env=_build_subprocess_env()\n"
+        "                )\n"
+        "            return self._agentrouter_transport.create(\n"
+        "                model=model, messages=messages or [], tools=tools,\n"
+        "                tool_choice=tool_choice, stream=bool(kwargs.pop(\"stream\", False)),\n"
+        "                request_kwargs=kwargs,\n"
+        "            )\n\n"
+        "        prompt_text = _format_messages_as_prompt(\n",
+        "self._agentrouter_transport.create(",
+    )
+
+    conversation = root / "agent" / "conversation_loop.py"
+    replace_required(
+        conversation,
+        '                    agent.provider in {"copilot-acp", "moa"}\n',
+        '                    (agent.provider == "copilot-acp" and not os.getenv("HERMES_AGENTROUTER_RAW_BRIDGE"))\n'
+        '                    or agent.provider == "moa"\n',
+        'agent.provider == "copilot-acp" and not os.getenv("HERMES_AGENTROUTER_RAW_BRIDGE")',
+    )
+
+    title = root / "agent" / "title_generator.py"
+    replace_required(title, "import logging\n", "import logging\nimport os\n", "import os\n")
+    replace_required(
+        title,
+        "    if not session_db or not session_id or not user_message or not assistant_response:\n",
+        "    # Avoid a second metered model call used only to name the session.\n"
+        "    if os.getenv(\"HERMES_AGENTROUTER_TOKEN_EFFICIENT\") == \"1\":\n"
+        "        return\n\n"
+        "    if not session_db or not session_id or not user_message or not assistant_response:\n",
+        "HERMES_AGENTROUTER_TOKEN_EFFICIENT",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--hermes-root", required=True, type=Path)
@@ -285,19 +358,29 @@ def main() -> None:
         root / "hermes_cli" / "model_switch.py",
         root / "hermes_cli" / "auth.py",
         root / "hermes_cli" / "providers.py",
+        root / "agent" / "conversation_loop.py",
+        root / "agent" / "title_generator.py",
     ]
     if not all(path.is_file() for path in required):
         raise SystemExit(f"Hermes source installation not found at {root}")
+    bridge_target = root / "agent" / "hermes_agentrouter_bridge.py"
+    bridge_existed = bridge_target.exists()
+    bridge_original = bridge_target.read_bytes() if bridge_existed else None
     originals = {path: path.read_bytes() for path in required}
     try:
         patch_models(root)
         patch_picker(root)
         patch_client(root)
         patch_nonstream_reasoning(root)
+        patch_raw_provider(root)
         patch_labels(root)
     except Exception:
         for path, content in originals.items():
             path.write_bytes(content)
+        if bridge_existed and bridge_original is not None:
+            bridge_target.write_bytes(bridge_original)
+        elif bridge_target.exists():
+            bridge_target.unlink()
         raise
     print("Hermes AgentRouter compatibility patch installed")
 

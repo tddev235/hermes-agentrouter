@@ -3,7 +3,7 @@
 [![CI](https://github.com/mardovip66/hermes-agentrouter/actions/workflows/ci.yml/badge.svg)](https://github.com/mardovip66/hermes-agentrouter/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Connect **Hermes Agent Desktop and CLI** to [AgentRouter](https://agentrouter.org) through the officially supported **Qwen Code ACP** client. The integration adds live model discovery, selectable models, and Hermes reasoning-effort controls. `glm-5.2` remains the safe default.
+Connect **Hermes Agent Desktop and CLI** to [AgentRouter](https://agentrouter.org) through Qwen Code's official OpenAI-compatible provider layer. Hermes—not a nested Qwen agent—keeps control of its native tools, skills, memory, sessions, and reasoning display. `glm-5.2` is pinned as the default and runtime model.
 
 Keywords: Hermes Agent API, AgentRouter Hermes plugin, Qwen Code ACP, GLM 5.2, GPT 5.5, Claude Opus, AI coding agent.
 
@@ -14,6 +14,9 @@ Keywords: Hermes Agent API, AgentRouter Hermes plugin, Qwen Code ACP, GLM 5.2, G
 - Makes AgentRouter models selectable inside the Hermes model picker.
 - Passes the selected Hermes model to Qwen dynamically.
 - Supports reasoning levels: off, low, medium, high, and max.
+- Creates an isolated `agentrouter` profile; normal Hermes/ChatGPT settings remain untouched.
+- Avoids the extra model call normally used only to auto-name a new session.
+- Streams provider usage data and caps the native Hermes loop at 20 turns by default.
 - Validates the token with `glm-5.2` before changing Hermes.
 - Stores tokens with Windows DPAPI, macOS Keychain, or Linux Secret Service/mode-600 fallback.
 - Creates backups and provides an idempotent uninstaller.
