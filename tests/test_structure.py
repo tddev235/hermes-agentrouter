@@ -50,6 +50,7 @@ for setting in ('HERMES_AGENTROUTER_RAW_BRIDGE', 'QWEN_CODE_ROOT', 'QWEN_CODE_VE
 node_bridge = (ROOT / 'scripts/qwen-provider-bridge.mjs').read_text(encoding='utf-8')
 assert 'stream_options: { include_usage: true }' in node_bridge
 assert "body.thinking = { type: 'disabled' }" in node_bridge
+assert 'maxRetries: 0' in node_bridge
 assert not (ROOT / 'scripts/update-ui-state.cjs').exists()
 
 tracked_text = '\n'.join(

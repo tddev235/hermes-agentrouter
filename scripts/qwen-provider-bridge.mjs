@@ -29,7 +29,9 @@ const config = {
   apiKey: process.env.OPENAI_API_KEY,
   baseUrl: process.env.OPENAI_BASE_URL || 'https://agentrouter.org/v1',
   timeout: 900000,
-  maxRetries: 2,
+  // Hermes owns retry/backoff. Nested SDK retries multiply delays (3 x 3)
+  // and can make one provider outage look like a six-minute agent hang.
+  maxRetries: 0,
 };
 const cliConfig = {
   getCliVersion: () => process.env.QWEN_CODE_VERSION || '0.19.3',
