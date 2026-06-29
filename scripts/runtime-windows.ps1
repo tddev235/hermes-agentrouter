@@ -1,3 +1,8 @@
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+  'PSAvoidUsingConvertToSecureStringWithPlainText',
+  '',
+  Justification='--token-file is explicitly selected by the user, validated, and immediately protected with user-scoped DPAPI.'
+)]
 param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
 $ErrorActionPreference='Stop'
 $root=Join-Path $env:LOCALAPPDATA 'hermes-agentrouter'
