@@ -1,0 +1,18 @@
+{
+  "name": "hermes-agentrouter",
+  "version": "0.1.0",
+  "description": "Connect Hermes Desktop and CLI to AgentRouter through Qwen ACP using GLM 5.2.",
+  "author": {
+    "name": "Hermes AgentRouter Contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Hermes AgentRouter",
+    "shortDescription": "Install and manage AgentRouter for Hermes with GLM 5.2.",
+    "longDescription": "Detects Hermes Desktop and CLI, securely stores the AgentRouter token, installs Qwen ACP, configures GLM 5.2, validates the connection, and provides launch and uninstall commands.",
+    "developerName": "Hermes AgentRouter Contributors",
+    "category": "Developer Tools",
+    "capabilities": ["installer", "provider-setup", "secure-credentials"],
+    "defaultPrompt": "Install or troubleshoot AgentRouter for Hermes using GLM 5.2."
+  }
+}
