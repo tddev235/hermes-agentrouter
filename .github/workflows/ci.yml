@@ -2,6 +2,7 @@ name: CI
 on:
   push:
   pull_request:
+
 jobs:
   validate:
     strategy:
@@ -13,11 +14,62 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - run: python tests/test_structure.py
-      - name: Parse PowerShell
+      - run: python tests/test_bridge.py
+      - run: python -m py_compile scripts/patch-hermes.py scripts/hermes_agentrouter_bridge.py
+      - run: node --check scripts/qwen-provider-bridge.mjs
+      - name: Validate shell scripts
+        if: runner.os == 'Linux'
+        run: |
+          bash -n install.sh scripts/runtime-posix.sh scripts/uninstall.sh
+          shellcheck install.sh scripts/runtime-posix.sh scripts/uninstall.sh
+      - name: Parse and lint PowerShell
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path ./install.ps1), [ref]$null, [ref]$errors) | Out-Null
-          if ($errors) { $errors | Format-List | Out-String | Write-Error }
+          $files = @('./install.ps1','./scripts/runtime-windows.ps1','./scripts/uninstall.ps1')
+          foreach ($file in $files) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$null, [ref]$errors) | Out-Null
+            if ($errors) { $errors | Format-List | Out-String | Write-Error }
+          }
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          $lint = @()
+          $lint += Invoke-ScriptAnalyzer -Path './install.ps1' -Severity Error
+          $lint += Invoke-ScriptAnalyzer -Path './scripts' -Recurse -Severity Error
+          if ($lint) { $lint | Format-Table | Out-String | Write-Error }
+
+  patch-roundtrip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check out tested Hermes source
+        run: git clone https://github.com/NousResearch/hermes-agent.git hermes-upstream
+      - name: Pin tested Hermes revision
+        working-directory: hermes-upstream
+        run: git checkout d0d2cf1c2f7e821e6d06a7a0e838ad66c6e17fd5
+      - name: Patch twice and compile
+        run: |
+          python scripts/patch-hermes.py --hermes-root hermes-upstream
+          python scripts/patch-hermes.py --hermes-root hermes-upstream
+          python -m py_compile \
+            hermes-upstream/agent/copilot_acp_client.py \
+            hermes-upstream/agent/conversation_loop.py \
+            hermes-upstream/agent/title_generator.py \
+            hermes-upstream/agent/hermes_agentrouter_bridge.py
+      - name: Exercise POSIX uninstaller and verify restoration
+        run: |
+          tmp_home="$RUNNER_TEMP/roundtrip-home"
+          mkdir -p "$tmp_home/.hermes" "$tmp_home/.local/share/hermes-agentrouter"
+          mv hermes-upstream "$tmp_home/.hermes/hermes-agent"
+          printf "HERMES_DATA_ROOT='%s/.hermes'\nSECRET_BACKEND='file'\n" "$tmp_home" \
+            > "$tmp_home/.local/share/hermes-agentrouter/settings.env"
+          HOME="$tmp_home" XDG_DATA_HOME="$tmp_home/.local/share" bash scripts/uninstall.sh
+          git -C "$tmp_home/.hermes/hermes-agent" diff --exit-code
+          test ! -e "$tmp_home/.hermes/hermes-agent/agent/hermes_agentrouter_bridge.py"

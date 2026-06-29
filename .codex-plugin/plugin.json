@@ -1,6 +1,6 @@
 {
   "name": "hermes-agentrouter",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Connect Hermes Desktop and CLI to AgentRouter through Qwen Code ACP with live models and reasoning controls.",
   "author": {
     "name": "Hermes AgentRouter Contributors"

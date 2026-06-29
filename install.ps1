@@ -50,18 +50,28 @@ if ($Target -eq 'Auto') {
 if ($Target -in @('Desktop','Both') -and -not $DesktopFound) { throw 'Hermes Desktop was selected but not found.' }
 if ($Target -in @('CLI','Both') -and -not $CliPath) { throw 'Hermes CLI was selected but not found.' }
 
+$ConfigCli = if ($CliPath) { $CliPath } else { $BundledCli }
+$HermesVersion = (& $ConfigCli --version 2>$null | Select-Object -First 1) -join ''
+if ($HermesVersion -notmatch 'Hermes Agent v0\.17\.0(?:\s|$)') {
+    throw "Unsupported Hermes version. Expected v0.17.0; detected: $HermesVersion"
+}
+
 $Node = Resolve-Executable @((Join-Path $BundledNode 'node.exe'),'node')
 $Npm = Resolve-Executable @((Join-Path $BundledNode 'npm.cmd'),'npm')
-$Qwen = Resolve-Executable @((Join-Path $BundledNode 'qwen.cmd'),'qwen')
-if (-not $Qwen) {
-    if (-not $Npm) { throw 'Node.js/npm is required to install Qwen Code.' }
-    if ($Node) { $env:PATH = "$(Split-Path $Node);$env:PATH" }
-    Write-Host 'Installing Qwen Code...'
-    & $Npm install -g "@qwen-code/qwen-code@$QwenVersion"
-    if ($LASTEXITCODE -ne 0) { throw 'Qwen Code installation failed.' }
-    $Qwen = Resolve-Executable @((Join-Path $BundledNode 'qwen.cmd'),'qwen')
+if (-not $Node -or -not $Npm) { throw 'Node.js and npm are required.' }
+New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
+$QwenPrefix = Join-Path $InstallRoot 'qwen'
+$env:PATH = "$(Split-Path $Node);$env:PATH"
+Write-Host "Installing private Qwen Code $QwenVersion..."
+& $Npm install --prefix $QwenPrefix --no-audit --no-fund "@qwen-code/qwen-code@$QwenVersion"
+if ($LASTEXITCODE -ne 0) { throw 'Qwen Code installation failed.' }
+$Qwen = Join-Path $QwenPrefix 'node_modules\.bin\qwen.cmd'
+$QwenRoot = Join-Path $QwenPrefix 'node_modules\@qwen-code\qwen-code'
+if (-not (Test-Path -LiteralPath $Qwen) -or -not (Test-Path -LiteralPath $QwenRoot)) {
+    throw 'The private Qwen Code runtime could not be located.'
 }
-if (-not $Qwen) { throw 'Qwen Code could not be located after installation.' }
+$ActualQwenVersion = & $Node -p 'require(process.argv[1]).version' (Join-Path $QwenRoot 'package.json')
+if ($ActualQwenVersion -ne $QwenVersion) { throw "Qwen version verification failed: $ActualQwenVersion" }
 
 $SecureToken = if ($TokenFile) {
     if (-not (Test-Path -LiteralPath $TokenFile)) { throw "Token file was not found: $TokenFile" }
@@ -87,12 +97,10 @@ try {
         }
     }
 
-    New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
     $EncryptedToken = $Token | ConvertTo-SecureString -AsPlainText -Force | ConvertFrom-SecureString
     [IO.File]::WriteAllText((Join-Path $InstallRoot 'token.dpapi'), $EncryptedToken, [Text.UTF8Encoding]::new($false))
     $EncryptedToken = $null
 
-    $ConfigCli = if ($CliPath) { $CliPath } else { $BundledCli }
     if (-not (Test-Path -LiteralPath $ProfileHome)) {
         & $ConfigCli profile create agentrouter --clone --no-alias --description 'Hermes with AgentRouter, pinned to GLM-5.2.'
         if ($LASTEXITCODE -ne 0) { throw 'Could not create the isolated AgentRouter profile.' }
@@ -111,9 +119,6 @@ try {
     & $ConfigCli -p agentrouter config set agent.max_turns 20
     & $ConfigCli -p agentrouter config set display.show_reasoning true
 
-    $Node = Resolve-Executable @((Join-Path $BundledNode 'node.exe'),'node')
-    $QwenRoot = Join-Path (Split-Path $Qwen) 'node_modules\@qwen-code\qwen-code'
-    if (-not (Test-Path -LiteralPath $QwenRoot)) { throw 'The Qwen Code provider runtime could not be located.' }
     $settings = @{ target=$Target; desktopExe=$DesktopExe; hermesCli=$CliPath; qwenCommand=$Qwen; nodeCommand=$Node; qwenRoot=$QwenRoot; qwenVersion=$QwenVersion; hermesRoot=$HermesRoot; profileHome=$ProfileHome; model=$Model; baseUrl=$BaseUrl }
     $settings | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $InstallRoot 'settings.json') -Encoding UTF8
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'scripts\runtime-windows.ps1') -Destination (Join-Path $InstallRoot 'runtime.ps1') -Force

@@ -3,30 +3,28 @@
 [![CI](https://github.com/tddev235/hermes-agentrouter/actions/workflows/ci.yml/badge.svg)](https://github.com/tddev235/hermes-agentrouter/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Connect **Hermes Agent Desktop and CLI** to [AgentRouter](https://agentrouter.org) through Qwen Code's official OpenAI-compatible provider layer. Hermes—not a nested Qwen agent—keeps control of its native tools, skills, memory, sessions, and reasoning display. `glm-5.2` is pinned as the default and runtime model.
+Connect **Hermes Agent Desktop and CLI** to [AgentRouter](https://agentrouter.org) through Qwen Code's official OpenAI-compatible provider layer. Hermes - not a nested Qwen agent - keeps control of its native tools, skills, memory, sessions, and reasoning display. `glm-5.2` is the default runtime model.
 
-Keywords: Hermes Agent API, AgentRouter Hermes plugin, Qwen Code ACP, GLM 5.2, GPT 5.5, Claude Opus, AI coding agent.
+Keywords: Hermes Agent API, AgentRouter Hermes plugin, Qwen Code, GLM 5.2, AI coding agent, native tool calling, reasoning streaming.
 
 ## Features
 
-- Detects Hermes Desktop and Hermes CLI automatically and asks which target to configure.
-- Fetches the current AgentRouter catalog from its public pricing endpoint.
-- Makes AgentRouter models selectable inside the Hermes model picker.
-- Passes the selected Hermes model to Qwen dynamically.
-- Supports reasoning levels: off, low, medium, high, and max.
-- Creates an isolated `agentrouter` profile; normal Hermes/ChatGPT settings remain untouched.
-- Uses a separate Electron data directory for the AgentRouter shortcut, preventing its model selection from leaking into normal Hermes Desktop.
-- Avoids the extra model call normally used only to auto-name a new session.
-- Streams provider usage data and caps the native Hermes loop at 20 turns by default.
-- Validates the token with `glm-5.2` before changing Hermes.
-- Stores tokens with Windows DPAPI, macOS Keychain, or Linux Secret Service/mode-600 fallback.
-- Creates backups and provides an idempotent uninstaller.
-- Never spoofs client headers; requests travel through Qwen Code.
+- Fetches the current AgentRouter model catalog from its public pricing endpoint.
+- Keeps Hermes in control of tools, skills, memory, sessions, and compression.
+- Supports reasoning levels off, low, medium, high, and max.
+- Creates an isolated `agentrouter` profile; normal Hermes settings remain untouched.
+- Uses separate Electron state for the AgentRouter Desktop shortcut.
+- Avoids the extra metered request normally used only to name a session.
+- Streams usage data and caps the Hermes tool loop at 20 turns by default.
+- Validates AgentRouter with `glm-5.2` before changing Hermes.
+- Stores tokens with Windows DPAPI, macOS Keychain, Linux Secret Service, or a mode-600 headless fallback.
+- Installs a private, verified Qwen Code 0.19.3 runtime instead of trusting a global version.
+- Provides transactional, fail-closed patching and a symmetric uninstaller.
 
 ## Requirements
 
-- Hermes Agent 0.17.x Desktop or CLI installed locally.
-- Node.js/npm when Qwen Code is not already installed.
+- Hermes Agent 0.17.0 CLI installed locally. Desktop integration additionally requires Hermes Desktop.
+- Node.js 20+ and npm.
 - Windows 10/11, macOS, Linux, or WSL.
 
 ## Install
@@ -39,10 +37,10 @@ cd hermes-agentrouter
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-Optional unattended target selection:
+Optional unattended installation:
 
 ```powershell
-.\install.ps1 -Target Both   # Auto | Desktop | CLI | Both
+.\install.ps1 -Target Both -TokenFile C:\secure\agentrouter-token.txt
 ```
 
 ### macOS / Linux / WSL
@@ -53,20 +51,32 @@ cd hermes-agentrouter
 ./install.sh
 ```
 
-The token prompt is hidden. For automation on Windows, `-TokenFile <path>` avoids putting the token in command history or process arguments.
+Optional unattended installation:
+
+```bash
+./install.sh --target cli --token-file /secure/agentrouter-token
+```
+
+Token values are read from a hidden prompt or file and never placed in process arguments.
 
 ## Use
 
-- Desktop: open **Hermes - AgentRouter** from the desktop.
+- Desktop: open **Hermes - AgentRouter**.
 - CLI: run `hermes-agentrouter`.
 - Health check: run `hermes-agentrouter --check`.
-- Model/reasoning: use Hermes' normal model menu; choose **AgentRouter**, then the model and effort.
+- Model/reasoning: use Hermes' normal controls under the isolated AgentRouter profile.
 
-AgentRouter currently advertises models through [`/api/pricing`](https://agentrouter.org/api/pricing). The installer includes a fallback catalog for offline startup.
+AgentRouter advertises models through [`/api/pricing`](https://agentrouter.org/api/pricing). The integration includes a small offline fallback catalog.
 
-## Updating and repair
+## Compatibility warning
 
-Pull the newest release and rerun the installer. The compatibility patch is idempotent and fails closed when an unsupported Hermes source layout is detected.
+The installer applies a compatibility patch to specific files inside Hermes Agent. Release 1.1.0 supports Hermes 0.17.0 and is tested in CI against upstream revision `d0d2cf1c2f7e821e6d06a7a0e838ad66c6e17fd5`.
+
+Patching is transactional and fail-closed: an unknown source layout stops installation and restores every touched file. Rerun the installer after Hermes updates only when CI supports that build.
+
+## Updating
+
+Pull the newest release and rerun the installer. Qwen Code is reinstalled privately at the exact tested version.
 
 ## Uninstall
 
@@ -78,25 +88,28 @@ Pull the newest release and rerun the installer. The compatibility patch is idem
 ./scripts/uninstall.sh
 ```
 
-This restores the Hermes configuration and patched source files, removes launchers, and deletes the stored integration token unless explicitly retained on Windows with `-KeepToken`.
+The uninstaller restores every patched Hermes source file, removes launchers, and deletes the stored integration token. The isolated `agentrouter` profile is preserved to avoid deleting user sessions.
 
 ## Security and privacy
 
-No token, local path, conversation, or Hermes database is committed or uploaded. The project does not copy the Hermes Desktop LevelDB. See [SECURITY.md](SECURITY.md) for reporting and the threat model.
+No token, local path, conversation, or Hermes database is committed or uploaded. The project does not read or modify Hermes Desktop LevelDB. See [SECURITY.md](SECURITY.md).
 
 ## Troubleshooting
 
 - **AgentRouter is missing from the picker:** close Hermes completely and relaunch it from the generated shortcut.
-- **`unauthorized client detected`:** do not call AgentRouter directly; use the generated launcher so Qwen Code handles the request.
-- **Patch reports unsupported layout:** update to a supported Hermes 0.17.x build or open an issue with the Hermes version and error only—never include your token.
-- **Token test fails:** confirm the token is active and that `https://agentrouter.org/v1` is reachable.
+- **Patch reports unsupported layout:** use a supported Hermes build or open an issue containing only its version and commit; never include a token.
+- **Token test fails:** confirm the token is active and `https://agentrouter.org/v1` is reachable.
 
 ## Development
 
 ```bash
 python tests/test_structure.py
+python tests/test_bridge.py
+bash -n install.sh scripts/runtime-posix.sh scripts/uninstall.sh
 python scripts/patch-hermes.py --help
 ```
+
+CI also patches the real supported Hermes source twice, compiles it, runs the POSIX uninstaller, and verifies byte-for-byte restoration.
 
 This is an independent community integration and is not affiliated with AgentRouter, Nous Research, or Qwen.
 

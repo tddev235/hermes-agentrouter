@@ -5,17 +5,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 required = [
     ROOT / '.codex-plugin/plugin.json', ROOT / 'README.md', ROOT / 'LICENSE',
-    ROOT / 'install.ps1', ROOT / 'install.sh', ROOT / 'scripts/runtime-windows.ps1',
+    ROOT / 'install.ps1', ROOT / 'install.sh',
+    ROOT / 'scripts/runtime-windows.ps1', ROOT / 'scripts/runtime-posix.sh',
     ROOT / 'scripts/qwen-provider-bridge.mjs', ROOT / 'scripts/hermes_agentrouter_bridge.py',
-    ROOT / 'scripts/uninstall.ps1', ROOT / 'scripts/uninstall.sh', ROOT / 'scripts/update-ui-state.cjs',
+    ROOT / 'scripts/uninstall.ps1', ROOT / 'scripts/uninstall.sh',
     ROOT / 'skills/hermes-agentrouter/SKILL.md',
 ]
-missing = [str(p.relative_to(ROOT)) for p in required if not p.exists()]
+missing = [str(path.relative_to(ROOT)) for path in required if not path.exists()]
 assert not missing, f'Missing files: {missing}'
 
 manifest = json.loads((ROOT / '.codex-plugin/plugin.json').read_text(encoding='utf-8'))
 assert manifest['name'] == 'hermes-agentrouter'
-assert manifest['version'] == '1.0.0'
+assert manifest['version'] == '1.1.0'
 
 for path in required:
     if path.is_file():
@@ -32,22 +33,32 @@ assert 'profile create agentrouter' in windows_installer
 assert '-p agentrouter config set' in windows_installer
 assert 'qwen-provider-bridge.mjs' in windows_installer
 
-runtime = (ROOT / 'scripts/runtime-windows.ps1').read_text(encoding='utf-8')
-assert "HERMES_AGENTROUTER_TOKEN_EFFICIENT='1'" in runtime
-assert "--model 'glm-5.2'" in runtime
-assert 'HERMES_DESKTOP_USER_DATA_DIR' in runtime
-assert "@{profile='agentrouter'}" in runtime and 'UTF8Encoding' in runtime
+windows_runtime = (ROOT / 'scripts/runtime-windows.ps1').read_text(encoding='utf-8')
+assert "HERMES_AGENTROUTER_TOKEN_EFFICIENT='1'" in windows_runtime
+assert "--model 'glm-5.2'" in windows_runtime
+assert 'HERMES_DESKTOP_USER_DATA_DIR' in windows_runtime
+assert "@{profile='agentrouter'}" in windows_runtime and 'UTF8Encoding' in windows_runtime
+
+posix_installer = (ROOT / 'install.sh').read_text(encoding='utf-8')
+posix_runtime = (ROOT / 'scripts/runtime-posix.sh').read_text(encoding='utf-8')
+assert 'profile create agentrouter' in posix_installer
+assert '@qwen-code/qwen-code@$QWEN_VERSION' in posix_installer
+assert 'config.before-agentrouter' not in posix_installer
+for setting in ('HERMES_AGENTROUTER_RAW_BRIDGE', 'QWEN_CODE_ROOT', 'QWEN_CODE_VERSION'):
+    assert setting in posix_runtime
 
 node_bridge = (ROOT / 'scripts/qwen-provider-bridge.mjs').read_text(encoding='utf-8')
 assert 'stream_options: { include_usage: true }' in node_bridge
+assert not (ROOT / 'scripts/update-ui-state.cjs').exists()
 
 tracked_text = '\n'.join(
-    p.read_text(encoding='utf-8', errors='ignore')
-    for p in ROOT.rglob('*')
-    if p.is_file() and '.git' not in p.parts and '__pycache__' not in p.parts and p.suffix != '.pyc'
+    path.read_text(encoding='utf-8', errors='ignore')
+    for path in ROOT.rglob('*')
+    if path.is_file() and '.git' not in path.parts and '__pycache__' not in path.parts and path.suffix != '.pyc'
 )
 for forbidden in ('C:\\Users\\' + 'mardo', 'api' + '.txt'):
     assert forbidden not in tracked_text, f'Local-only value found: {forbidden}'
-assert ('Code' + 'â') not in tracked_text and ('Hermes ' + 'â') not in tracked_text
+for mojibake in ('\u00c3\u00a2', '\u00d8\u00a7', '\u00d9'):
+    assert mojibake not in tracked_text, f'Encoding corruption found: {mojibake}'
 
 print('structure checks passed')
