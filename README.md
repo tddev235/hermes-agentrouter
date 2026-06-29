@@ -64,7 +64,13 @@ Token values are read from a hidden prompt or file and never placed in process a
 - Desktop: open **Hermes - AgentRouter**.
 - CLI: run `hermes-agentrouter`.
 - Health check: run `hermes-agentrouter --check`.
+- Replace an expired key safely: run `hermes-agentrouter key set`.
+- Windows always-on Telegram/Discord gateway: run `hermes-agentrouter gateway install-service` once.
 - Model/reasoning: use Hermes' normal controls under the isolated AgentRouter profile.
+
+The supervised gateway restarts after an unexpected process exit. Key replacement is validated before the old secret is replaced, then the Windows gateway is restarted automatically. An expired or revoked upstream key cannot produce model responses; supervision keeps messaging online and makes recovery immediate after a valid key is supplied.
+
+Only one process anywhere may poll a Telegram bot token. Stop old server/Desktop gateway instances before enabling the Windows service; repeated Telegram `Conflict: terminated by other getUpdates request` messages mean another machine is still polling the same bot.
 
 AgentRouter advertises models through [`/api/pricing`](https://agentrouter.org/api/pricing). The integration includes a small offline fallback catalog.
 
@@ -99,6 +105,7 @@ No token, local path, conversation, or Hermes database is committed or uploaded.
 - **AgentRouter is missing from the picker:** close Hermes completely and relaunch it from the generated shortcut.
 - **Patch reports unsupported layout:** use a supported Hermes build or open an issue containing only its version and commit; never include a token.
 - **Token test fails:** confirm the token is active and `https://agentrouter.org/v1` is reachable.
+- **Intermittent Telegram replies:** stop every older gateway using the same bot token. This is a Telegram single-poller requirement, not a model retry issue.
 
 ## Development
 
