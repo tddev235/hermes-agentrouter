@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 MODEL="glm-5.2"
 BASE_URL="https://agentrouter.org/v1"
@@ -20,7 +22,7 @@ elif [[ -n "$DESKTOP" ]]; then target=desktop; else target=cli; fi
 
 if [[ -z "$QWEN" ]]; then
   command -v npm >/dev/null || { echo "npm is required to install Qwen Code." >&2; exit 1; }
-  npm install -g @qwen-code/qwen-code
+  npm install -g @qwen-code/qwen-code@0.19.3
   QWEN="$(command -v qwen)"
 fi
 
@@ -45,6 +47,9 @@ unset TOKEN OPENAI_API_KEY
 
 CONFIG="${HERMES_HOME:-$HOME/.hermes}/config.yaml"
 [[ -f "$CONFIG" ]] && cp -n "$CONFIG" "$INSTALL_ROOT/config.before-agentrouter.yaml" || true
+[[ -f "$INSTALL_ROOT/config.before-agentrouter.yaml" ]] && chmod 600 "$INSTALL_ROOT/config.before-agentrouter.yaml"
+HERMES_ROOT="$(python3 -c 'import pathlib,hermes_cli; print(pathlib.Path(hermes_cli.__file__).resolve().parents[1])')"
+python3 "$SCRIPT_DIR/scripts/patch-hermes.py" --hermes-root "$HERMES_ROOT"
 python3 - "$CONFIG" <<'PY'
 import re,sys
 from pathlib import Path
@@ -60,11 +65,10 @@ set -euo pipefail
 export OPENAI_API_KEY="\$($secret_cmd)"
 export OPENAI_BASE_URL="$BASE_URL" OPENAI_MODEL="$MODEL"
 export HERMES_COPILOT_ACP_COMMAND="$QWEN"
-export HERMES_COPILOT_ACP_ARGS="--acp --bare --auth-type openai --model $MODEL"
+export HERMES_COPILOT_ACP_ARGS='--acp --bare --auth-type openai --model {model}'
 if [[ "\${1:-}" == --desktop ]]; then exec "$DESKTOP"; fi
 if [[ "\${1:-}" == --check ]]; then exec "$QWEN" --bare --auth-type openai --model "$MODEL" --approval-mode plan --output-format json --max-session-turns 1 --max-tool-calls 0 'Reply exactly AGENTROUTER_GLM52_OK'; fi
 exec "$CLI" chat --provider copilot-acp --model "$MODEL" "\$@"
 EOF
 chmod 700 "$HOME/.local/bin/hermes-agentrouter"
 echo "Installed for $target. Run: hermes-agentrouter"
-

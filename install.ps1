@@ -27,7 +27,7 @@ function Resolve-Executable([string[]]$Names) {
 $DesktopFound = Test-Path -LiteralPath $DesktopExe
 $PathCli = Resolve-Executable @('hermes')
 $CliPath = if ($PathCli) { $PathCli } elseif (Test-Path -LiteralPath $BundledCli) { $BundledCli } else { $null }
-$CliFound = [bool]$PathCli
+$CliFound = [bool]$CliPath
 
 if (-not $DesktopFound -and -not $CliPath) {
     throw 'Hermes was not found. Install Hermes Desktop or Hermes CLI first.'
@@ -55,7 +55,7 @@ if (-not $Qwen) {
     if (-not $Npm) { throw 'Node.js/npm is required to install Qwen Code.' }
     if ($Node) { $env:PATH = "$(Split-Path $Node);$env:PATH" }
     Write-Host 'Installing Qwen Code...'
-    & $Npm install -g '@qwen-code/qwen-code'
+    & $Npm install -g '@qwen-code/qwen-code@0.19.3'
     if ($LASTEXITCODE -ne 0) { throw 'Qwen Code installation failed.' }
     $Qwen = Resolve-Executable @((Join-Path $BundledNode 'qwen.cmd'),'qwen')
 }
@@ -77,9 +77,12 @@ try {
         $old = @($env:OPENAI_API_KEY,$env:OPENAI_BASE_URL,$env:OPENAI_MODEL,$env:PATH)
         $env:OPENAI_API_KEY = $Token; $env:OPENAI_BASE_URL = $BaseUrl; $env:OPENAI_MODEL = $Model
         $env:PATH = "$(Split-Path $Qwen);$env:PATH"
-        $result = & $Qwen --bare --auth-type openai --model $Model --approval-mode plan --output-format json --max-session-turns 1 --max-tool-calls 0 'Reply exactly AGENTROUTER_GLM52_OK' 2>&1 | Out-String
-        if ($LASTEXITCODE -ne 0 -or $result -notmatch 'AGENTROUTER_GLM52_OK') { throw "AgentRouter validation failed.`n$result" }
-        $env:OPENAI_API_KEY=$old[0]; $env:OPENAI_BASE_URL=$old[1]; $env:OPENAI_MODEL=$old[2]; $env:PATH=$old[3]
+        try {
+            $result = & $Qwen --bare --auth-type openai --model $Model --approval-mode plan --output-format json --max-session-turns 1 --max-tool-calls 0 'Reply exactly AGENTROUTER_GLM52_OK' 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0 -or $result -notmatch 'AGENTROUTER_GLM52_OK') { throw 'AgentRouter validation failed. Verify the token and try again.' }
+        } finally {
+            $env:OPENAI_API_KEY=$old[0]; $env:OPENAI_BASE_URL=$old[1]; $env:OPENAI_MODEL=$old[2]; $env:PATH=$old[3]
+        }
     }
 
     New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
@@ -94,9 +97,16 @@ try {
     }
 
     $ConfigCli = if ($CliPath) { $CliPath } else { $BundledCli }
+    $PatchPython = Resolve-Executable @((Join-Path $HermesRoot 'hermes-agent\venv\Scripts\python.exe'),'python')
+    if (-not $PatchPython) { throw 'Python is required to install the Hermes compatibility patch.' }
+    & $PatchPython (Join-Path $PSScriptRoot 'scripts\patch-hermes.py') --hermes-root (Join-Path $HermesRoot 'hermes-agent')
+    if ($LASTEXITCODE -ne 0) { throw 'Hermes compatibility patch failed; all source changes were rolled back.' }
     & $ConfigCli config set model.default $Model
+    if ($LASTEXITCODE -ne 0) { throw 'Could not set the Hermes default model.' }
     & $ConfigCli config set model.provider copilot-acp
+    if ($LASTEXITCODE -ne 0) { throw 'Could not set the Hermes provider.' }
     & $ConfigCli config set model.base_url 'acp://copilot'
+    if ($LASTEXITCODE -ne 0) { throw 'Could not set the Hermes ACP endpoint.' }
 
     $settings = @{ target=$Target; desktopExe=$DesktopExe; hermesCli=$CliPath; qwenCommand=$Qwen; model=$Model; baseUrl=$BaseUrl }
     $settings | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $InstallRoot 'settings.json') -Encoding UTF8
@@ -116,10 +126,8 @@ try {
             $UiTools = Join-Path $InstallRoot 'ui-tools'
             New-Item -ItemType Directory -Path $UiTools -Force | Out-Null
             Copy-Item (Join-Path $PSScriptRoot 'scripts\update-ui-state.cjs') (Join-Path $UiTools 'update-ui-state.cjs') -Force
-            $UiBackup = Join-Path $InstallRoot 'desktop-leveldb.before-agentrouter'
-            if (-not (Test-Path $UiBackup)) { Copy-Item -LiteralPath $LevelDb -Destination $UiBackup -Recurse }
             $env:PATH = "$(Split-Path $Node);$env:PATH"
-            & $Npm install --prefix $UiTools classic-level --no-audit --no-fund | Out-Null
+            & $Npm install --prefix $UiTools classic-level@3.0.0 --no-audit --no-fund | Out-Null
             & $Node (Join-Path $UiTools 'update-ui-state.cjs') $LevelDb
             if ($LASTEXITCODE -ne 0) { throw 'Hermes Desktop model-state update failed.' }
         }
@@ -132,7 +140,7 @@ try {
 
     if ($Target -in @('Desktop','Both')) {
         $desktop=[Environment]::GetFolderPath('Desktop')
-        $shortcut=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $desktop 'Hermes - AgentRouter GLM 5.2.lnk'))
+        $shortcut=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $desktop 'Hermes - AgentRouter.lnk'))
         $shortcut.TargetPath=(Get-Command powershell.exe).Source
         $shortcut.Arguments='-NoProfile -ExecutionPolicy Bypass -File "'+(Join-Path $InstallRoot 'runtime.ps1')+'" --desktop'
         $shortcut.WorkingDirectory=$InstallRoot; $shortcut.IconLocation="$DesktopExe,0"; $shortcut.Save()
